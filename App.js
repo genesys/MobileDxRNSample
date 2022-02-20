@@ -16,15 +16,20 @@ import { Snackbar } from 'react-native-paper';
 const { GenesysCloud } = NativeModules;
 
 // On Android device, sets the screen orientation to be as on the activating App:
-const orientation = Platform.OS ===  'android' ? GenesysCloud.getConstants().SCREEN_ORIENTATION_LOCKED : undefined
-const eventEmitter = Platform.OS ===  'android' ? DeviceEventEmitter : new NativeEventEmitter(GenesysCloud)
+const orientation = Platform.OS === 'android' ? GenesysCloud.getConstants().SCREEN_ORIENTATION_LOCKED : undefined
+
+// Create event emitter to subscribe to chat events
+const eventEmitter = Platform.OS === 'android' ? DeviceEventEmitter : new NativeEventEmitter(GenesysCloud)
+
+
+const listeners = {}
 
 export default function App() {
 
   const [isSnackVisible, setIsSnackVisible] = useState(false)
   const [errorMessage, setMessage] = useState("");  
 
-  // Error event is of the following format: {errorCode:"", reason:"", message:""}
+  // Error events are of the following format: {errorCode:"", reason:"", message:""}
   const onError = (error) => {
     const snackMessage = error.message ?? error.reason
     console.log(`onError: errorCode = ${error.errorCode}, message = ${snackMessage}`);  
@@ -32,13 +37,29 @@ export default function App() {
     setIsSnackVisible(true)
   };
   
-  // Adds a listener to messenger chat errors.
-  const subscription = eventEmitter.addListener('onMessengerError', onError);
+  // State events are of the following format: {state:""} 
+  const onStateChanged = (state) => {
+    console.log(`onStateChanged: state = ${state.state}, listeners size = ${Object.keys(listeners).length}`);  
+
+    if(state.state == 'ended'){
+        Object.keys(listeners).forEach((key)=>{
+          const listener = listeners[key]
+          console.log(`removing listener: ${key}`);
+          if(listener) listener.remove();
+        })
+    }
+  };
   
   // data contains the fields content
   const onSubmit = (data) => {
     
     setIsSnackVisible(false)
+
+    // Adds a listener to messenger chat errors.
+    listeners['onMessengerError'] = eventEmitter.addListener('onMessengerError', onError);
+
+    // Adds a listener to messenger chat state events.
+    listeners['onMessengerState'] = eventEmitter.addListener('onMessengerState', onStateChanged);
 
     if(orientation != undefined) {
       GenesysCloud.requestScreenOrientation(orientation)
@@ -49,7 +70,6 @@ export default function App() {
 
   const onDismissSnackBar = () => setIsSnackVisible(false);
 
-  console.log(`isSnackVisible=${isSnackVisible}`)
 
   return (
     <SafeAreaView style={styles.container}>
