@@ -7,26 +7,49 @@
  */
 
 import React from 'react';
-import { NativeModules, Platform, StyleSheet, Text, View, Image, SafeAreaView } from 'react-native';
+import {useState} from 'react';
+import { NativeModules, Platform, StyleSheet, Text, View, Image, SafeAreaView, DeviceEventEmitter, NativeEventEmitter } from 'react-native';
 import { ChatForm } from './ChatForm.js';
 import theme from './theme.style'
+import { Snackbar } from 'react-native-paper';
 
 const { GenesysCloud } = NativeModules;
 
+// On Android device, sets the screen orientation to be as on the activating App:
 const orientation = Platform.OS ===  'android' ? GenesysCloud.getConstants().SCREEN_ORIENTATION_LOCKED : undefined
+const eventEmitter = Platform.OS ===  'android' ? DeviceEventEmitter : new NativeEventEmitter(GenesysCloud)
 
 export default function App() {
 
+  const [isSnackVisible, setIsSnackVisible] = useState(false)
+  const [errorMessage, setMessage] = useState("");  
+
+  // Error event is of the following format: {errorCode:"", reason:"", message:""}
+  const onError = (error) => {
+    const snackMessage = error.message ?? error.reason
+    console.log(`onError: errorCode = ${error.errorCode}, message = ${snackMessage}`);  
+    setMessage(snackMessage)
+    setIsSnackVisible(true)
+  };
+  
+  // Adds a listener to messenger chat errors.
+  const subscription = eventEmitter.addListener('onMessengerError', onError);
+  
+  // data contains the fields content
   const onSubmit = (data) => {
-    console.log(`got data = ${data}`)
     
+    setIsSnackVisible(false)
+
     if(orientation != undefined) {
       GenesysCloud.requestScreenOrientation(orientation)
     }
     
     GenesysCloud.startChat(data.deploymentId, data.domain, data.tokenStoreKey, data.logging);
-
   }
+
+  const onDismissSnackBar = () => setIsSnackVisible(false);
+
+  console.log(`isSnackVisible=${isSnackVisible}`)
 
   return (
     <SafeAreaView style={styles.container}>
@@ -36,6 +59,17 @@ export default function App() {
       </View>
       <Text style={styles.title_sub}>Fill the following parameters to start your chat</Text>
       <ChatForm onSubmit={onSubmit} />
+      <Snackbar duration={5000}
+        visible={isSnackVisible}
+        style={{backgroundColor:'#454545'}}
+        onDismiss={onDismissSnackBar}
+        action={{
+          label: 'ok',
+          onPress: () => {
+            setIsSnackVisible(false)
+          },
+        }}
+      >{errorMessage}</Snackbar>
     </SafeAreaView>
   );
 }
