@@ -8,7 +8,7 @@
 
 import React from 'react';
 import {useState} from 'react';
-import { NativeModules, Platform, StyleSheet, Text, View, Image, SafeAreaView, DeviceEventEmitter } from 'react-native';
+import { NativeModules, Platform, StyleSheet, Text, View, Image, SafeAreaView, DeviceEventEmitter, NativeEventEmitter } from 'react-native';
 import { ChatForm } from './ChatForm.js';
 import theme from './theme.style'
 import { Snackbar } from 'react-native-paper';
@@ -17,6 +17,7 @@ const { GenesysCloud } = NativeModules;
 
 // On Android device, sets the screen orientation to be as on the activating App:
 const orientation = Platform.OS ===  'android' ? GenesysCloud.getConstants().SCREEN_ORIENTATION_LOCKED : undefined
+const eventEmitter = Platform.OS ===  'android' ? DeviceEventEmitter : new NativeEventEmitter(GenesysCloud)
 
 export default function App() {
 
@@ -32,7 +33,7 @@ export default function App() {
   };
   
   // Adds a listener to messenger chat errors.
-  DeviceEventEmitter.addListener('onMessengerError', onError);
+  const subscription = eventEmitter.addListener('onMessengerError', onError);
   
   // data contains the fields content
   const onSubmit = (data) => {
